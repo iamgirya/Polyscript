@@ -131,53 +131,6 @@ class _TextEditorWidgetState extends State<TextEditorWidget> {
   bool wasDoubleTap(Point<int> position) =>
       position == editor.localUser.cursorPosition && DateTime.now().difference(lastTapTime).inMilliseconds < 400;
 
-  void processKeyEvent(KeyEvent event) {
-    if (event is! KeyUpEvent) {
-      if (InputManager.isCtrlVEvent(event)) {
-        pasteTextFromClipboard();
-      } else if (InputManager.isCtrlCEvent(event)) {
-        copyTextToClipboard();
-      } else if (InputManager.isCharInputEvent(event)) {
-        editor.sendJSON(
-          ReplaceTextAction(editor.localUser.name, [event.character!]),
-        );
-      } else if (InputManager.isDeleteEvent(event)) {
-        editor.sendJSON(
-          ClearTextAction(editor.localUser.name),
-        );
-      } else if (InputManager.isNewLineEvent(event)) {
-        editor.sendJSON(
-          ReplaceTextAction(editor.localUser.name, ["\n"]),
-        );
-      } else if (InputManager.isControlPressed(event)) {
-        InputManager.isCtrlPressed = true;
-      } else {
-        keyboardNavigation(event);
-      }
-    } else {
-      if (InputManager.isControlPressed(event)) {
-        InputManager.isCtrlPressed = false;
-      }
-    }
-  }
-
-  void scrollListOnEdges() {
-    var cursorPosition = cursorPositionToPixelPosition(editor.localUser.cursorPosition);
-    if (cursorPosition != null && cursorPosition.dy > editorHeight) {
-      scrollController.animateTo(scrollController.offset + (cursorPosition.dy - editorHeight + 20 + 16),
-          duration: const Duration(milliseconds: 100), curve: Curves.linear);
-    }
-    if (cursorPosition != null && cursorPosition.dy < 42) {
-      scrollController.animateTo(scrollController.offset + cursorPosition.dy - 20,
-          duration: const Duration(milliseconds: 100), curve: Curves.linear);
-    }
-  }
-
-  void updateLocalUserPosition(Point<int> newPosition) {
-    editor.sendJSON(UpdatePositionAction(editor.localUser.name, newPosition));
-    preffereCursorPositionX = newPosition.x;
-  }
-
   void selectWord(Point<int> position) {
     int startOfWord = editor.file.lines[position.y].first.substring(0, position.x).lastIndexOf(' ') + 1;
     int endOfWord = editor.file.lines[position.y].first.substring(position.x).indexOf(' ');
@@ -189,6 +142,47 @@ class _TextEditorWidgetState extends State<TextEditorWidget> {
     editor.sendJSON(UpdatePositionAction(editor.localUser.name, Point(endOfWord, position.y)));
     editor.updateLocalUser(newSelection: Selection(Point(startOfWord, position.y), Point(endOfWord, position.y)));
     preffereCursorPositionX = endOfWord;
+  }
+
+  void updateSelection(Offset position) {
+    var newPosition = pixelPositionToCursorPosition(position);
+
+    if (highlightStart != null && newPosition != null) {
+      editor.sendJSON(UpdatePositionAction(editor.localUser.name, newPosition));
+      editor.updateLocalUser(newSelection: Selection(highlightStart!, newPosition));
+      preffereCursorPositionX = newPosition.x;
+
+      scrollListOnEdges();
+    }
+  }
+
+  void updateLocalUserPosition(Point<int> newPosition) {
+    editor.sendJSON(UpdatePositionAction(editor.localUser.name, newPosition));
+    preffereCursorPositionX = newPosition.x;
+  }
+
+  void processKeyEvent(KeyEvent event) {
+    if (event is! KeyUpEvent) {
+      if (event.isCtrlVEvent) {
+        pasteTextFromClipboard();
+      } else if (event.isCtrlCEvent) {
+        copyTextToClipboard();
+      } else if (event.isChar) {
+        editor.sendJSON(ReplaceTextAction(editor.localUser.name, [event.character!]));
+      } else if (event.isDeleteEvent) {
+        editor.sendJSON(ClearTextAction(editor.localUser.name));
+      } else if (event.isNewLineEvent) {
+        editor.sendJSON(ReplaceTextAction(editor.localUser.name, ["\n"]));
+      } else if (event.isControl) {
+        InputEventManager.isCtrlPressed = true;
+      } else {
+        keyboardNavigation(event);
+      }
+    } else {
+      if (event.isControl) {
+        InputEventManager.isCtrlPressed = false;
+      }
+    }
   }
 
   void pasteTextFromClipboard() {
@@ -205,14 +199,13 @@ class _TextEditorWidgetState extends State<TextEditorWidget> {
   }
 
   void keyboardNavigation(KeyEvent event) {
-    if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
-      if (editor.localUser.cursorPosition.x == editor.file.lines[editor.localUser.cursorPosition.y].first.length) {
-        if (editor.localUser.cursorPosition.y < editor.file.lines.length - 1) {
-          editor.sendJSON(
-            UpdatePositionAction(editor.localUser.name, Point(0, editor.localUser.cursorPosition.y + 1)),
-          );
-          preffereCursorPositionX = editor.localUser.cursorPosition.x;
-        }
+    if (event.isArrowRight) {
+      if (editor.localUser.cursorPosition.x == editor.file.lines[editor.localUser.cursorPosition.y].first.length &&
+          editor.localUser.cursorPosition.y < editor.file.lines.length - 1) {
+        editor.sendJSON(
+          UpdatePositionAction(editor.localUser.name, Point(0, editor.localUser.cursorPosition.y + 1)),
+        );
+        preffereCursorPositionX = editor.localUser.cursorPosition.x;
       } else {
         editor.sendJSON(
           UpdatePositionAction(
@@ -220,102 +213,76 @@ class _TextEditorWidgetState extends State<TextEditorWidget> {
         );
       }
       preffereCursorPositionX = editor.localUser.cursorPosition.x;
-    } else if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
-      if (editor.localUser.cursorPosition.x == 0) {
-        if (editor.localUser.cursorPosition.y > 0) {
-          editor.sendJSON(UpdatePositionAction(
-              editor.localUser.name,
-              Point(
-                editor.file.lines[editor.localUser.cursorPosition.y - 1].first.length,
-                editor.localUser.cursorPosition.y - 1,
-              )));
-          preffereCursorPositionX = editor.localUser.cursorPosition.x;
-        }
+    } else if (event.isArrowLeft) {
+      if (editor.localUser.cursorPosition.x == 0 && editor.localUser.cursorPosition.y > 0) {
+        editor.sendJSON(UpdatePositionAction(
+            editor.localUser.name,
+            Point(
+              editor.file.lines[editor.localUser.cursorPosition.y - 1].first.length,
+              editor.localUser.cursorPosition.y - 1,
+            )));
+        preffereCursorPositionX = editor.localUser.cursorPosition.x;
       } else {
         editor.sendJSON(UpdatePositionAction(
             editor.localUser.name, Point(editor.localUser.cursorPosition.x - 1, editor.localUser.cursorPosition.y)));
         preffereCursorPositionX = editor.localUser.cursorPosition.x;
       }
-    } else if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
-      // LineWidget, на котором находится курсор
-      Element? element = editor.file.lines[editor.localUser.cursorPosition.y].second.currentContext as Element?;
-      Point<int>? newPosition;
-      Offset? cursorPosition = cursorPositionToPixelPosition(editor.localUser.cursorPosition);
-      double yOffset = (editor.file.lines[editor.localUser.cursorPosition.y].second.currentState! as LineWidgetState)
-              .isExistUnlocalUsersOnLine
-          ? 20
-          : 0;
+    } else if (event.isArrowUp) {
+      if (editor.localUser.cursorPosition.y > 0) {
+        Offset? cursorPosition = cursorPositionToPixelPosition(editor.localUser.cursorPosition);
 
-      if (cursorPosition != null) {
-        // делаем сдвиг по координатам
-        cursorPosition = Offset(cursorPosition.dx, cursorPosition.dy - LineWidget.baseHeight + yOffset);
-        // вычисляем новое положение
-        newPosition = pixelPositionToCursorPosition(cursorPosition);
-        // если оно null, значит, курсор переходит на следующий LineWidget
-        if (newPosition == null && editor.localUser.cursorPosition.y > 0) {
-          element = editor.file.lines[editor.localUser.cursorPosition.y - 1].second.currentContext as Element;
-          newPosition = pixelPositionToCursorPosition(cursorPosition);
-        }
+        if (cursorPosition != null) {
+          Point<int>? newCursorPosition = pixelPositionToCursorPosition(
+            cursorPosition - const Offset(0, LineWidget.baseHeight),
+          );
 
-        if (newPosition != null) {
-          if (newPosition != editor.localUser.cursorPosition) {
-            editor.sendJSON(UpdatePositionAction(editor.localUser.name, newPosition));
-            preffereCursorPositionX = newPosition.x;
-          }
-          // Случай, когда при сдвиге положение курсора не изменилось возможно лишь при случае, когда с линии, на которой есть другой пользователь идёт попытака перейти на другую линию. В этом случае, наборот, не учитываем сдвиг по y
-          else if (editor.localUser.cursorPosition.y > 0) {
-            cursorPosition = Offset(cursorPosition.dx, cursorPosition.dy - LineWidget.baseHeight);
-            element = editor.file.lines[editor.localUser.cursorPosition.y - 1].second.currentContext as Element;
-            newPosition = pixelPositionToCursorPosition(cursorPosition);
-            if (newPosition != null) {
-              editor.sendJSON(UpdatePositionAction(editor.localUser.name, newPosition));
-              preffereCursorPositionX = newPosition.x;
+          if (newCursorPosition != null) {
+            if (newCursorPosition != editor.localUser.cursorPosition) {
+              editor.sendJSON(UpdatePositionAction(editor.localUser.name, newCursorPosition));
+              preffereCursorPositionX = newCursorPosition.x;
             }
-          }
 
-          scrollListOnEdges();
+            scrollListOnEdges();
+          }
         }
       }
-    } else if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
-      // LineWidget, на котором находится курсор
-      Element? element = editor.file.lines[editor.localUser.cursorPosition.y].second.currentContext as Element?;
-      Point<int>? newPosition;
-      Offset? cursorPosition = cursorPositionToPixelPosition(editor.localUser.cursorPosition);
-      double yOffset = (editor.file.lines[editor.localUser.cursorPosition.y].second.currentState! as LineWidgetState)
-              .isExistUnlocalUsersOnLine
-          ? 20
-          : 0;
+    } else if (event.isArrowDown) {
+      if (editor.localUser.cursorPosition.y < editor.file.lines.length - 1) {
+        var currentLineState =
+            (editor.file.lines[editor.localUser.cursorPosition.y].second.currentState as LineWidgetState);
 
-      if (cursorPosition != null) {
-        // делаем сдвиг по координатам
-        cursorPosition = Offset(cursorPosition.dx, cursorPosition.dy + LineWidget.baseHeight + yOffset);
-        // вычисляем новое положение
-        newPosition = pixelPositionToCursorPosition(cursorPosition);
-        // если оно null, значит, курсор переходит на следующий LineWidget
-        if (newPosition == null && editor.localUser.cursorPosition.y + 1 < editor.file.lines.length) {
-          element = editor.file.lines[editor.localUser.cursorPosition.y + 1].second.currentContext as Element;
-          newPosition = pixelPositionToCursorPosition(cursorPosition);
-        }
+        double yOffset = (currentLineState.isExistUnlocalUsersOnLine ? 20 : 0);
 
-        if (newPosition != null) {
-          if (newPosition != editor.localUser.cursorPosition) {
-            editor.sendJSON(UpdatePositionAction(editor.localUser.name, newPosition));
-            preffereCursorPositionX = newPosition.x;
-          }
-          // Случай, когда при сдвиге положение курсора не изменилось возможно лишь при случае, когда с линии, на которой есть другой пользователь идёт попытака перейти на другую линию. В этом случае, наборот, не учитываем сдвиг по y
-          else if (editor.localUser.cursorPosition.y + 1 < editor.file.lines.length) {
-            cursorPosition = Offset(cursorPosition.dx, cursorPosition.dy + LineWidget.baseHeight);
-            element = editor.file.lines[editor.localUser.cursorPosition.y + 1].second.currentContext as Element;
-            newPosition = pixelPositionToCursorPosition(cursorPosition);
-            if (newPosition != null) {
-              editor.sendJSON(UpdatePositionAction(editor.localUser.name, newPosition));
-              preffereCursorPositionX = newPosition.x;
+        Offset? cursorPosition = cursorPositionToPixelPosition(editor.localUser.cursorPosition);
+
+        if (cursorPosition != null) {
+          // вычисляем новое положение
+          Point<int>? newCursorPosition = pixelPositionToCursorPosition(
+            cursorPosition + Offset(0, LineWidget.baseHeight + yOffset),
+          );
+
+          if (newCursorPosition != null) {
+            if (newCursorPosition != editor.localUser.cursorPosition) {
+              editor.sendJSON(UpdatePositionAction(editor.localUser.name, newCursorPosition));
+              preffereCursorPositionX = newCursorPosition.x;
             }
-          }
 
-          scrollListOnEdges();
+            scrollListOnEdges();
+          }
         }
       }
+    }
+  }
+
+  void scrollListOnEdges() {
+    var cursorPosition = cursorPositionToPixelPosition(editor.localUser.cursorPosition);
+    if (cursorPosition != null && cursorPosition.dy > editorHeight) {
+      scrollController.animateTo(scrollController.offset + (cursorPosition.dy - editorHeight),
+          duration: const Duration(milliseconds: 100), curve: Curves.linear);
+    }
+    if (cursorPosition != null && cursorPosition.dy < 42 + 20) {
+      scrollController.animateTo(scrollController.offset + cursorPosition.dy - 42 - 20,
+          duration: const Duration(milliseconds: 100), curve: Curves.linear);
     }
   }
 
@@ -387,17 +354,5 @@ class _TextEditorWidgetState extends State<TextEditorWidget> {
     }
 
     return null;
-  }
-
-  void updateSelection(Offset position) {
-    var newPosition = pixelPositionToCursorPosition(position);
-
-    if (highlightStart != null && newPosition != null) {
-      editor.sendJSON(UpdatePositionAction(editor.localUser.name, newPosition));
-      editor.updateLocalUser(newSelection: Selection(highlightStart!, newPosition));
-      preffereCursorPositionX = newPosition.x;
-
-      scrollListOnEdges();
-    }
   }
 }

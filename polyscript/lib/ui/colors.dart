@@ -9,7 +9,7 @@ const disable = Color(0xFFB6B6B6);
 const text = Color(0xFF000000);
 
 Color randomCursorColor() {
-  switch (Random().nextInt(4)) {
+  switch (Random().nextInt(6)) {
     case 0:
       return Colors.indigo;
     case 1:
@@ -18,6 +18,10 @@ Color randomCursorColor() {
       return Colors.pink;
     case 3:
       return Colors.green;
+    case 4:
+      return Colors.brown;
+    case 5:
+      return Colors.teal;
   }
 
   return Colors.black;

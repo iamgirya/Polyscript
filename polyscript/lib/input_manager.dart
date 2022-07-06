@@ -2,24 +2,32 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 
-class InputManager {
+extension InputEventManager on KeyEvent {
   static var isCtrlPressed = false;
 
-  static bool isCharInputEvent(KeyEvent event) =>
-      event.character != null &&
-      event.logicalKey != LogicalKeyboardKey.enter &&
-      event.logicalKey != LogicalKeyboardKey.backspace &&
-      event.logicalKey != LogicalKeyboardKey.control;
+  bool get isArrowRight => logicalKey == LogicalKeyboardKey.arrowRight;
 
-  static bool isCtrlCEvent(KeyEvent event) => isCtrlPressed && event.logicalKey == LogicalKeyboardKey.keyC;
+  bool get isArrowLeft => logicalKey == LogicalKeyboardKey.arrowLeft;
 
-  static bool isCtrlVEvent(KeyEvent event) => isCtrlPressed && event.logicalKey == LogicalKeyboardKey.keyV;
+  bool get isArrowUp => logicalKey == LogicalKeyboardKey.arrowUp;
 
-  static bool isDeleteEvent(KeyEvent event) => event.logicalKey == LogicalKeyboardKey.backspace;
+  bool get isArrowDown => logicalKey == LogicalKeyboardKey.arrowDown;
 
-  static bool isNewLineEvent(KeyEvent event) => event.logicalKey == LogicalKeyboardKey.enter;
+  bool get isControl => Platform.isWindows
+      ? logicalKey == LogicalKeyboardKey.controlLeft || logicalKey == LogicalKeyboardKey.controlRight
+      : logicalKey == LogicalKeyboardKey.metaLeft || logicalKey == LogicalKeyboardKey.metaLeft;
 
-  static bool isControlPressed(KeyEvent event) => Platform.isWindows
-      ? event.logicalKey == LogicalKeyboardKey.controlLeft || event.logicalKey == LogicalKeyboardKey.controlRight
-      : event.logicalKey == LogicalKeyboardKey.metaLeft || event.logicalKey == LogicalKeyboardKey.metaLeft;
+  bool get isChar =>
+      character != null &&
+      logicalKey != LogicalKeyboardKey.enter &&
+      logicalKey != LogicalKeyboardKey.backspace &&
+      logicalKey != LogicalKeyboardKey.control;
+
+  bool get isCtrlCEvent => isCtrlPressed && logicalKey == LogicalKeyboardKey.keyC;
+
+  bool get isCtrlVEvent => isCtrlPressed && logicalKey == LogicalKeyboardKey.keyV;
+
+  bool get isDeleteEvent => logicalKey == LogicalKeyboardKey.backspace;
+
+  bool get isNewLineEvent => logicalKey == LogicalKeyboardKey.enter;
 }
