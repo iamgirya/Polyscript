@@ -8,6 +8,7 @@ import 'package:polyscript/model/user_model.dart';
 import 'package:polyscript/ui/editor/editor_bar.dart';
 import 'package:polyscript/ui/editor/line/line_widget.dart';
 import 'package:provider/provider.dart';
+import '../../input_manager.dart';
 import '../../model/actions/replace_text_action.dart';
 import '../../model/actions/update_position_action.dart';
 import 'editor_inherit.dart';
@@ -26,7 +27,6 @@ class _TextEditorWidgetState extends State<TextEditorWidget> {
   var editorHeight = 0.0;
   var preffereCursorPositionX = 0;
   var lastPresentedLineIndex = 0;
-  var isCtrlPressed = false;
 
   late DateTime lastTapTime;
   late Point<int>? highlightStart;
@@ -128,32 +128,35 @@ class _TextEditorWidgetState extends State<TextEditorWidget> {
     );
   }
 
+  bool wasDoubleTap(Point<int> position) =>
+      position == editor.localUser.cursorPosition && DateTime.now().difference(lastTapTime).inMilliseconds < 400;
+
   void processKeyEvent(KeyEvent event) {
     if (event is! KeyUpEvent) {
-      if (isCtrlVEvent(event)) {
+      if (InputManager.isCtrlVEvent(event)) {
         pasteTextFromClipboard();
-      } else if (isCtrlCEvent(event)) {
+      } else if (InputManager.isCtrlCEvent(event)) {
         copyTextToClipboard();
-      } else if (isCharInputEvent(event)) {
+      } else if (InputManager.isCharInputEvent(event)) {
         editor.sendJSON(
           ReplaceTextAction(editor.localUser.name, [event.character!]),
         );
-      } else if (isDeleteEvent(event)) {
+      } else if (InputManager.isDeleteEvent(event)) {
         editor.sendJSON(
           ClearTextAction(editor.localUser.name),
         );
-      } else if (isNewLineEvent(event)) {
+      } else if (InputManager.isNewLineEvent(event)) {
         editor.sendJSON(
           ReplaceTextAction(editor.localUser.name, ["\n"]),
         );
-      } else if (isControlPressed(event)) {
-        isCtrlPressed = true;
+      } else if (InputManager.isControlPressed(event)) {
+        InputManager.isCtrlPressed = true;
       } else {
         keyboardNavigation(event);
       }
     } else {
-      if (isControlPressed(event)) {
-        isCtrlPressed = false;
+      if (InputManager.isControlPressed(event)) {
+        InputManager.isCtrlPressed = false;
       }
     }
   }
@@ -200,27 +203,6 @@ class _TextEditorWidgetState extends State<TextEditorWidget> {
       Clipboard.setData(ClipboardData(text: selectedText));
     }
   }
-
-  bool wasDoubleTap(Point<int> position) =>
-      position == editor.localUser.cursorPosition && DateTime.now().difference(lastTapTime).inMilliseconds < 400;
-
-  bool isCharInputEvent(KeyEvent event) =>
-      event.character != null &&
-      event.logicalKey != LogicalKeyboardKey.enter &&
-      event.logicalKey != LogicalKeyboardKey.backspace &&
-      event.logicalKey != LogicalKeyboardKey.control;
-
-  bool isCtrlCEvent(KeyEvent event) => isCtrlPressed && event.logicalKey == LogicalKeyboardKey.keyC;
-
-  bool isCtrlVEvent(KeyEvent event) => isCtrlPressed && event.logicalKey == LogicalKeyboardKey.keyV;
-
-  bool isDeleteEvent(KeyEvent event) => event.logicalKey == LogicalKeyboardKey.backspace;
-
-  bool isNewLineEvent(KeyEvent event) => event.logicalKey == LogicalKeyboardKey.enter;
-
-  bool isControlPressed(KeyEvent event) => Platform.isWindows
-      ? event.logicalKey == LogicalKeyboardKey.controlLeft || event.logicalKey == LogicalKeyboardKey.controlRight
-      : event.logicalKey == LogicalKeyboardKey.metaLeft || event.logicalKey == LogicalKeyboardKey.metaLeft;
 
   void keyboardNavigation(KeyEvent event) {
     if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
